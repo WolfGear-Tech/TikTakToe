@@ -1,4 +1,4 @@
-FROM python:3.10
+FROM python
 WORKDIR /server
 RUN apk add --no-cache gcc musl-dev linux-headers
 EXPOSE 8090
