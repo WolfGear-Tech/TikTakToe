@@ -5,7 +5,7 @@ from threading import Thread
 class ClientSocketHandler():
 
     def __init__(self):
-        self.SERVER_ADDR = (gethostbyname(gethostname()), 8090)
+        self.SERVER_ADDR = (gethostbyname("otoma.solutions"), 8090)
         self.ENCODE_FORMAT = "utf-8"
         self.DISCONECT_MESSAGE = "!DISCONNECT"
         self.HANDLE_CONNECTION = True
