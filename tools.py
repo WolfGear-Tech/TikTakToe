@@ -16,11 +16,10 @@ def ParseAdress(adress):
     adressIP = adress if isIP else gethostbyname(adress)
     return adressIP
 
-def EncodeMensage(status, user, mensage):
-    dict = {"status": status, "user": user, "mensage": mensage}
-    encoded_mensage = base64.b64encode(bytes(str(dict),'utf-8'))
-    return encoded_mensage
+def EncodeMessage(**kargs):
+    encodedMessage = base64.b64encode(bytes(str(kargs),'utf-8'))
+    return encodedMessage
 
-def DecodeMensage(mensage):
-    decoded_mensage = json.loads(base64.b64decode(mensage).decode('utf-8').replace("'",'"'))
-    return decoded_mensage
+def DecodeMessage(message):
+    decodedMessage = json.loads(base64.b64decode(message).decode('utf-8').replace("'",'"'))
+    return decodedMessage

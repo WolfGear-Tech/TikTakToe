@@ -1,10 +1,10 @@
 from socket import *
 #from socket import socket, gethostbyname, gethostname, AF_INET, SOCK_STREAM
 from threading import Thread
-from tools import InputAdress
-import time
+from tools import InputAdress, EncodeMessage, DecodeMessage
 from OtoPy import UsefulTools
 import atexit
+import time
 
 oLogger = UsefulTools.OLogger(logStreamLevel="DEBUG")
 
@@ -12,11 +12,12 @@ class ClientSocketHandler():
 
     def __init__(self):
         self.SERVER_ADDR = InputAdress()
+        self.USER_NAME = input("Set a user name: ")
         self.ENCODE_FORMAT = "utf-8"
         self.DISCONECT_MESSAGE = "!DISCONNECT"
         self.HANDLE_CONNECTION = True
         self.clientSocket = socket(AF_INET, SOCK_STREAM)
-        self.responseListenerThread = Thread(target=self.ResponseListener, daemon=True)     
+        self.responseListenerThread = Thread(target=self.ResponseListener)     
     
     def ConnectServer(self):
         try:
@@ -35,19 +36,19 @@ class ClientSocketHandler():
     def SendMessage(self, message):
         if message != self.DISCONECT_MESSAGE:
             oLogger.LogInfo(f"[SEND] - Sending the message: {message} to the server")
-            self.clientSocket.send(message.encode(self.ENCODE_FORMAT))
+            self.clientSocket.send(EncodeMessage(message=message, user={"name": self.USER_NAME}))
         else:
             self.CloseSocket()
 
     def ResponseListener(self):
         while self.HANDLE_CONNECTION:
-            recivedMessage = self.clientSocket.recv(2048).decode(self.ENCODE_FORMAT).split("#")
+            recivedDict = DecodeMessage(self.clientSocket.recv(2048))
 
-            if recivedMessage[0] == "202":
-                oLogger.LogInfo(recivedMessage)
-            elif recivedMessage[0] == "210":
-                oLogger.LogInfo(recivedMessage)
-            elif recivedMessage[0] == "1006":
+            if recivedDict["status"] == 202:
+                oLogger.LogInfo(recivedDict["message"])
+            elif recivedDict["status"] == 210:
+                oLogger.LogInfo(f"{recivedDict['user']}: {recivedDict['message']}")
+            elif recivedDict["status"] == 1006:
                 self.HANDLE_CONNECTION = False
                 
         exit()
@@ -59,11 +60,11 @@ class ClientSocketHandler():
             while self.HANDLE_CONNECTION:
                 message = input("Enter your message: ")
                 self.SendMessage(message)
-                time.sleep(0.1)
+                time.sleep(1)
     
     def CloseSocket(self):
         oLogger.LogWarning("Closing forcely the connection...")
-        self.clientSocket.send(conn.DISCONECT_MESSAGE.encode(self.ENCODE_FORMAT))
+        self.clientSocket.send(EncodeMessage(message=self.DISCONECT_MESSAGE))
         self.responseListenerThread.join()
         oLogger.LogWarning("Connection Closed")
 
