@@ -50,6 +50,9 @@ authors = ["Wolf Gear <opensource@wolfgear.tech>"]
 python = "^3.10"
 loguru = "*"
 PyQt5 = "*"
+OtoPy = "^1.6.6"
+pygame = "^2.1.2"
+numpy = "^1.23.2"
 
 
 [tool.poetry.dev-dependencies]
