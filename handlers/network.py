@@ -1,4 +1,3 @@
-from logging.handlers import SocketHandler
 from socket import socket, AF_INET, SOCK_STREAM
 from threading import Thread
 from OtoPy import UsefulTools
@@ -98,7 +97,6 @@ class ClientSocketHandler():
                     elif status in range(500, 9999):
                         # Server Error
                         self.StopSocket()
-                time.sleep(30)
             exit()
 
         except ConnectionRefusedError:
@@ -155,8 +153,9 @@ if __name__ == "__main__":
     conn = ClientSocketHandler("172.81.60.73", 8090, "Other", logOnTerminal=True, logLevel="DEBUG")
     print(conn.StartSocket())
     print(conn.SendData(message="delta"))
-    for index in range(1, 11):
+    for index in range(1, 60):
         print(conn.SendData(message=str(index + 600)))
-    time.sleep(500)
+    time.sleep(12)
     print(conn.GetQueuedData())
     print(conn.StopSocket())
+    time.sleep(5)
