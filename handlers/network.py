@@ -8,39 +8,29 @@ import base64
 class ClientSocketHandler():
     oLogger = None
 
-    def __init__(self, adress, port, userName, **logSettings):
+    def __init__(self, **logSettings):
         self.oLogger = UsefulTools.OLogger(
             streamLogging=logSettings.get("logOnTerminal", False), 
             logStreamLevel=logSettings.get("logLevel", "NOTSET"),
         )
-        self.SERVER_ADDR = (adress, port)
-        self.USER = {"user": {"name" : userName}}
+        self.SERIAL = "QLY8LNU7FqR7LhRfEJmR"
         self.ENCODE_FORMAT = "utf-8"
+        self.DISCONECT_RESPONSE = {"STATUS": 1006}
+        self.DISCONECT_REQUEST = {"REQUEST_CODE": 1006}
+        self.ECHO_REQUEST = {"REQUEST_CODE": 100}
+        self.ECHO_RESPONSE = {"STATUS": 100}
 
         self.__CLIENT_SOCKET = socket(AF_INET, SOCK_STREAM)
-        self.__DISCONECT_MESSAGE = {"message": "!DISCONNECT"}
-        self.__KEEP_ALIVE = {"message": "!KEEP_ALIVE"}
         self.__CONNECTION_STATE = False
         self.__readyToSendDataQueue = []
         self.__recivedDataQueue = []  
         self.__safeToWriteSendQueue = True
         self.__safeToWriteReciveQueue = True
-    
-    def __Connect(self) -> bool:
-        try:
-            self.__CLIENT_SOCKET.connect(self.SERVER_ADDR)
-            self.oLogger.LogWarning("Connected to Server!")
-            return True
-        except ConnectionRefusedError:
-            self.oLogger.LogError(f"Fail to connect to adress: {self.SERVER_ADDR}")
-            return False
-        except Exception:
-            self.oLogger.LogExceptError("Some error has occured")
-            return False
 
     def __EncodeAndSendData(self, data: dict[str: any]) -> None:
-        data.update(self.USER)
-        encodedData = base64.b64encode(bytes(str(data),'utf-8'))
+        dataToSend = dict(self.ECHO_REQUEST)
+        dataToSend.update(data)
+        encodedData = base64.b64encode(bytes(str(dataToSend),'utf-8'))
         self.__CLIENT_SOCKET.send(encodedData)
 
     def __SendQueuedData(self) -> None:
@@ -51,7 +41,7 @@ class ClientSocketHandler():
             self.__EncodeAndSendData(self.__readyToSendDataQueue.pop(0))
             self.__safeToWriteSendQueue = True
         else:
-            self.__EncodeAndSendData(self.__KEEP_ALIVE)
+            self.__EncodeAndSendData(self.ECHO_REQUEST)
     
     def __ReciveAndDecodedData(self) -> dict:
         clientSocketResponse = self.__CLIENT_SOCKET.recv(2048)
@@ -60,23 +50,62 @@ class ClientSocketHandler():
             decodedDictList = []
             for response in responseList:
                 decodedDictList.append(json.loads(response))
-            self.oLogger.LogDebug(f"Income Data DICT LIST: {decodedDictList}")
             return decodedDictList
-        return [{"status": 204}]
+        return [{"status": 100}]
 
-    def __MessageHandler(self, status: int, data: dict) -> None:
-            message = data.get("message", None)
+    def __Connect(self, SERVER_ADDR) -> bool:
+        try:
+            print(self.__CLIENT_SOCKET.connect(SERVER_ADDR))
+            self.oLogger.LogWarning("Connected to Server!")
+            self.__EncodeAndSendData({"REQUEST_CODE": 101, "CRED": {"user": "!NO_USER", "password": "!NO_PASSWORD", "serial": self.SERIAL}})
+            return True
+        except ConnectionRefusedError:
+            self.oLogger.LogError(f"Fail to connect to adress: {self.SERVER_ADDR}")
+            return False
+        except Exception:
+            self.oLogger.LogExceptError("Some error has occured")
+            return False
 
-            if status == 202:
-                self.oLogger.LogInfo(message)
-            elif status == 210:
-                self.oLogger.LogInfo(message)
-                while not self.__safeToWriteReciveQueue: 
-                    ... #Wait to Write on Shared variable
-                self.__safeToWriteSendQueue = False
-                self.__recivedDataQueue.append(data)
-                self.oLogger.LogDebug(f"The new Recievment was appended <{data}>")
-                self.__safeToWriteSendQueue = True
+    def __AppendRecievedData(self, data):
+        self.oLogger.LogInfo(data)
+        while not self.__safeToWriteReciveQueue: 
+            ... #Wait to Write on Shared variable
+        self.__safeToWriteSendQueue = False
+        self.__recivedDataQueue.append(data)
+        self.oLogger.LogDebug(f"The new Recievment was appended <{data}>")
+        self.__safeToWriteSendQueue = True
+
+    def __DataHandler(self, data: dict) -> None:
+        STATUS = data.get("STATUS", 500)
+        if STATUS in range(100, 200):
+            #Connection Stablisment
+            if STATUS == 100: pass
+
+            elif STATUS == 101: 
+                ... #Login stuff
+
+        elif STATUS in range(200, 300):
+            # Success
+            if STATUS == 202:
+                pass #Data recived by server
+                self.oLogger.LogDebug("Ok Response for data Recieved")
+
+            elif STATUS == 205:
+                #Data recieved from another user
+                self.__AppendRecievedData(data)
+
+            elif STATUS == 210:
+                #Broadcast made by server from specific user
+                self.__AppendRecievedData(data)
+
+        elif STATUS in range(400, 500):
+            # Client Error
+            ...
+
+        elif STATUS in range(500, 9999):
+            # Server Error
+            if STATUS == 1006:
+                self.StopSocket()
 
     def __ClientHandler_Thread(self) -> None:
         try:
@@ -84,19 +113,7 @@ class ClientSocketHandler():
                 self.__SendQueuedData()
                 responseList = self.__ReciveAndDecodedData()
                 for response in responseList:
-                    status = response.get("status", 500)
-                    if status in range(200, 300):
-                        # Success
-                        if not status == 204:
-                            self.__MessageHandler(status, response)
-
-                    elif status in range(400, 500):
-                        # Client Error
-                        ...
-
-                    elif status in range(500, 9999):
-                        # Server Error
-                        self.StopSocket()
+                    self.__DataHandler(response)
             exit()
 
         except ConnectionRefusedError:
@@ -110,7 +127,7 @@ class ClientSocketHandler():
                     ...
                 self.__safeToWriteSendQueue = False
                 self.__readyToSendDataQueue.append(data)
-                self.oLogger.LogDebug(conn.__readyToSendDataQueue)
+                self.oLogger.LogDebug(self.__readyToSendDataQueue)
                 self.__safeToWriteSendQueue = True
                 return True
         return False
@@ -127,10 +144,12 @@ class ClientSocketHandler():
 
         return []
 
-    def StartSocket(self) -> bool:
+    def StartSocket(self, serverAddres, serverPort) -> bool:
+        SERVER_ADDR = (serverAddres, serverPort)
+
         if not self.__CONNECTION_STATE:
             self.oLogger.LogWarning("Starting Client...")
-            if self.__Connect():
+            if self.__Connect(SERVER_ADDR):
                 self.__CONNECTION_STATE = True
                 Thread(target=self.__ClientHandler_Thread, daemon=True).start()
                 return True
@@ -143,19 +162,20 @@ class ClientSocketHandler():
         if self.__CONNECTION_STATE:
             self.oLogger.LogWarning("Closing the connection...")
             self.__CONNECTION_STATE = False
-            self.__EncodeAndSendData(self.__DISCONECT_MESSAGE)
+            self.__EncodeAndSendData(self.DISCONECT_REQUEST)
             self.oLogger.LogWarning("Connection Closed.")
             return True
 
         return False
 
 if __name__ == "__main__":
-    conn = ClientSocketHandler("172.81.60.73", 8090, "Other", logOnTerminal=True, logLevel="DEBUG")
-    print(conn.StartSocket())
-    print(conn.SendData(message="delta"))
+    conn = ClientSocketHandler(logOnTerminal=True, logLevel="DEBUG")
+    print(conn.StartSocket("192.168.1.252", 8090))
     for index in range(1, 60):
-        print(conn.SendData(message=str(index + 600)))
-    time.sleep(12)
+        print(conn.SendData(REQUEST_CODE = 205, numTest=str(index + 600)))
     print(conn.GetQueuedData())
-    print(conn.StopSocket())
-    time.sleep(5)
+    input()
+    print(conn.GetQueuedData())
+    input()
+    conn.StopSocket()
+    input()
