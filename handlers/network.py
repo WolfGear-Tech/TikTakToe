@@ -170,7 +170,7 @@ class ClientSocketHandler():
 
 if __name__ == "__main__":
     conn = ClientSocketHandler(logOnTerminal=True, logLevel="DEBUG")
-    print(conn.StartSocket("192.168.1.252", 8090))
+    print(conn.StartSocket("172.81.60.73", 8090))
     for index in range(1, 60):
         print(conn.SendData(REQUEST_CODE = 205, numTest=str(index + 600)))
     print(conn.GetQueuedData())
